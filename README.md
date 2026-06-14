@@ -1,4 +1,4 @@
-markdown# 🎬 ReelCraft — AI Showrunner
+## 🎬 ReelCraft — AI Showrunner
 
 > Autonomously transforms a topic into a fully produced short drama —
 > from scriptwriting to video generation — powered by Qwen + Wan AI
