@@ -435,7 +435,7 @@ API calls are made to Alibaba Cloud DashScope:
 
 ## 🏗 Architecture
 
-See `realcraft_architecture.png` for the full system diagram.
+See `reelcraft_architecture.png` for the full system diagram.
 
 ---
 
