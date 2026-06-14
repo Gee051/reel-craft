@@ -1,70 +1,224 @@
-# Getting Started with Create React App
+# 🎬 ReelCraft — AI Showrunner
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+> Autonomously transforms a topic into a fully produced short drama —
+> from scriptwriting to video generation — powered by Qwen + Wan AI
+> on Alibaba Cloud.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 🏆 Hackathon
 
-### `npm start`
+**Global AI Hackathon Series with Qwen Cloud**
+**Track 2: AI Showrunner**
+Built with Qwen Cloud · Alibaba Cloud · Wan AI
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 🎯 What It Does
 
-### `npm test`
+ReelCraft is an end-to-end AI Showrunner agent that takes a single
+topic from a user and autonomously runs a four-stage pipeline to
+produce a finished short drama video.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+**User types a topic → ReelCraft produces a short drama video.**
 
-### `npm run build`
+No manual steps. No editing required. Fully autonomous.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+---
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 🔄 Pipeline
+User Input (topic + genre)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+↓
 
-### `npm run eject`
+[Stage 1] Script Agent — Qwen
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Generates a full short drama script
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+using professional craft rules
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+↓
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+[Stage 2] Storyboard Agent — Qwen
 
-## Learn More
+Converts each scene into precise
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+visual descriptions optimized for Wan
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+↓
 
-### Code Splitting
+[Stage 3] Video Agent — Wan AI
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Generates one video clip per scene
 
-### Analyzing the Bundle Size
+via Alibaba Cloud DashScope API
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+↓
 
-### Making a Progressive Web App
+[Stage 4] Assembly Agent — MoviePy
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Stitches all clips into one
 
-### Advanced Configuration
+finished short drama video
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+↓
 
-### Deployment
+Final Video Output
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+---
 
-### `npm run build` fails to minify
+## 🛠 Tech Stack
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+| Layer | Technology |
+|-------|-----------|
+| AI Text Model | Qwen (via Alibaba Cloud DashScope) |
+| AI Video Model | Wan / wanx2.1-t2v-plus |
+| Backend | Python + Flask |
+| Frontend | React.js |
+| Video Assembly | MoviePy |
+| Cloud | Alibaba Cloud |
+| API Protocol | OpenAI-compatible + DashScope SDK |
+
+---
+
+## 📁 Project Structure
+reel-craft/
+
+├── backend/
+
+│   ├── agents/
+
+│   │   ├── script_agent.py       # Qwen script generation
+
+│   │   ├── storyboard_agent.py   # Scene visual descriptions
+
+│   │   ├── video_agent.py        # Wan video generation
+
+│   │   └── assembly_agent.py     # MoviePy clip assembly
+
+│   ├── app.py                    # Flask API server
+
+│   ├── config.py                 # Configuration + API settings
+
+│   └── requirements.txt          # Python dependencies
+
+├── frontend/
+
+│   └── src/
+
+│       ├── App.js                # Main React UI
+
+│       └── App.css               # Styling
+
+├── architecture.png              # System architecture diagram
+
+├── LICENSE                       # MIT License
+
+└── README.md
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- Alibaba Cloud account with DashScope API key
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/Gee051/reel-craft.git
+cd reel-craft
+```
+
+### 2. Set up the backend
+```bash
+python -m venv venv
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # Mac/Linux
+
+cd backend
+pip install -r requirements.txt
+```
+
+### 3. Add your API key
+Create a `.env` file inside the `backend` folder:
+DASHSCOPE_API_KEY=your_api_key_here
+
+Get your API key from: **https://home.qwencloud.com**
+
+### 4. Run the backend
+```bash
+cd backend
+python app.py
+```
+Backend runs at: `http://localhost:5000`
+
+### 5. Run the frontend
+```bash
+cd frontend
+npm install
+npm start
+```
+Frontend runs at: `http://localhost:3000`
+
+---
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check — confirms Alibaba Cloud backend |
+| POST | `/generate` | Full pipeline — script → storyboard → video → assembly |
+| POST | `/generate/script` | Script generation only |
+| POST | `/generate/storyboard` | Script + storyboard only |
+
+### Example Request
+```json
+POST /generate
+{
+  "topic": "a girl discovers her boyfriend has a secret family",
+  "genre": "drama"
+}
+```
+
+### Example Response
+```json
+{
+  "success": true,
+  "topic": "a girl discovers her boyfriend has a secret family",
+  "genre": "drama",
+  "script": "SCENE 1:\n...",
+  "storyboard": ["Close up shot of...", "Wide shot of..."],
+  "video_url": "/output/final_video.mp4",
+  "scenes_count": 4
+}
+```
+
+---
+
+## ☁️ Alibaba Cloud Deployment
+
+Backend is deployed on Alibaba Cloud ECS.  
+API calls are made to Alibaba Cloud DashScope:
+- Text generation: `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`
+- Video generation: `https://dashscope-intl.aliyuncs.com/api/v1`
+
+---
+
+## 🏗 Architecture
+
+See `architecture.png` for the full system diagram.
+
+---
+
+## 📝 License
+
+MIT License — see LICENSE file for details.
+
+---
+
+## 👤 Author
+Name: OG
+Built for the Global AI Hackathon Series with Qwen Cloud
+Track 2: AI Showrunner
