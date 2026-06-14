@@ -209,7 +209,7 @@ API calls are made to Alibaba Cloud DashScope:
 
 ## 🏗 Architecture
 
-See `architecture.png` for the full system diagram.
+See `realcraft_architecture.png` for the full system diagram.
 
 ---
 
