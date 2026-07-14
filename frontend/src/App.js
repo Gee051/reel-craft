@@ -2,7 +2,7 @@ import { useState } from "react";
 import { FiFilm } from "react-icons/fi";
 import "./App.css";
 
-const API = "http://localhost:5000";
+const API = "http://47.236.205.58:5000";
 
 function App() {
   const [topic, setTopic] = useState("");
