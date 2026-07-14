@@ -1,86 +1,115 @@
 import os
+import json
 from openai import OpenAI
 from config import DASHSCOPE_API_KEY, QWEN_MODEL
 
-# Initialize Qwen client
 client = OpenAI(
     api_key=DASHSCOPE_API_KEY,
     base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 )
 
-# Storyboard system prompt — translates drama into visual language
 STORYBOARD_SYSTEM_PROMPT = """
-You are a professional cinematographer and storyboard artist 
-specializing in short-form video content.
+You are a film director and cinematographer planning a single
+continuous short drama for a text-to-video AI (Wan).
 
-Your job is to read a short drama script and convert each 
-scene into a precise visual description that a video 
-generation AI can use to generate footage.
+GOAL: Every scene must look like it belongs to ONE continuous film —
+same characters, same location, same visual world.
 
-STRICT RULES:
+CRITICAL TECHNIQUE — ONE CHARACTER PER SHOT:
+Text-to-video cannot reliably keep two consistent faces in the same
+frame. So even when a scene has two people talking, you film it the
+way real directors do: cut between single-character shots. Show one
+person reacting, then cut to the other speaking. NEVER put two named
+characters in the same shot. Each generated clip contains exactly one
+person (or a hand / object / empty space), never two faces at once.
 
-1. ONE STORYBOARD ENTRY PER SCENE — each scene in the 
-   script becomes exactly one visual description.
+STEP 1 — Build a STORY BIBLE (locked, reused everywhere):
+- CHARACTERS: For EVERY character in the script, give an exact,
+  unchanging physical description — age, build, hair (color, length,
+  style), skin tone, exact clothing with colors, one memorable
+  feature. These descriptions are copied word-for-word into every
+  shot that character appears in. Never vary them.
+- LOCATION: One consistent place, described concretely.
+- TIME & LIGHT: One time of day, one lighting style.
+- PALETTE & MOOD: Consistent colors and emotional tone.
 
-2. VISUAL LANGUAGE ONLY — describe what the camera sees.
-   No dialogue. No internal thoughts. Only visuals.
+STEP 2 — Break the story into shots (not scenes). A two-person
+exchange becomes multiple single-character shots that intercut.
+Each shot:
+- Opens with ONE character's exact bible description (or a hand/
+  object/room if no face is needed)
+- Uses the exact same location, light, and palette
+- Adds shot type (close up / medium / wide) and one clear action
+- Progresses the story: establish -> escalate -> payoff
+- Ends with: cinematic, realistic, consistent film look
 
-3. EACH DESCRIPTION MUST INCLUDE:
-   - Shot type (close up, wide shot, medium shot, etc.)
-   - Subject and their physical state (posture, expression, action)
-   - Environment (location, lighting, time of day)
-   - Mood (tense, emotional, dramatic, suspenseful)
-   - Duration in seconds (between 3-5 seconds)
-   - Style (cinematic, realistic, dramatic lighting)
+RULES:
+- Exactly ONE named character per shot. Never two faces together.
+- Keep every character visually identical across all their shots.
+- No meta-notes, no bracketed instructions, no explanations inside
+  the prompts — only pure visual description Wan can render.
+- Each prompt is one flowing paragraph, rich in visual detail.
 
-4. FORMAT — Use this exact structure for each scene:
-
-   SCENE [NUMBER]:
-   Shot: [shot type]
-   Subject: [what/who is in frame and what they are doing]
-   Environment: [location, lighting, atmosphere]
-   Mood: [emotional tone]
-   Duration: [X seconds]
-   Style: cinematic, realistic, dramatic lighting
-   
-   Prompt: [one single flowing sentence combining all of 
-   the above — this is what gets sent to the video model]
-
-5. THE PROMPT LINE is the most important part. 
-   It must be a single detailed sentence describing 
-   the full visual in a way a video AI can understand.
-   
-   Example of a good prompt:
-   "Close up shot of a young woman's trembling hands 
-   holding a smartphone in a dimly lit kitchen, 
-   shoulders tense, face turned away, cinematic 
-   dramatic lighting, 4 seconds"
-
-6. MAXIMUM 4 SCENES — match the number of scenes 
-   in the script exactly.
-
-Output only the storyboard. No explanations. No preamble.
+OUTPUT — return ONLY valid JSON, no markdown, no preamble:
+{
+  "bible": {
+    "characters": ["desc of character 1", "desc of character 2"],
+    "location": "...",
+    "light": "...",
+    "palette": "..."
+  },
+  "scenes": [
+    "full wan prompt for shot 1 ...",
+    "full wan prompt for shot 2 ...",
+    "full wan prompt for shot 3 ..."
+  ]
+}
 """
 
-def generate_storyboard(script: str) -> list:
+
+def generate_storyboard(script: str, num_scenes: int = 3,
+                        existing_bible: dict = None) -> dict:
     """
-    Convert a script into a list of visual scene descriptions
-    optimized for Wan video generation.
-    
+    Convert a script into continuity-locked, one-character-per-shot Wan
+    prompts. If existing_bible is provided, new shots reuse that locked
+    character/world so continued scenes match the original film.
+
     Args:
-        script: The full drama script from script_agent
-    
+        script: The full drama script
+        num_scenes: How many shots to produce
+        existing_bible: Optional locked bible from a previous generation
+
     Returns:
-        List of scene prompt strings for Wan API
+        dict with 'scenes' (list of Wan prompts) and 'bible'
     """
-    
+
+    if existing_bible:
+        bible_instruction = f"""
+    IMPORTANT — This is a CONTINUATION. You MUST reuse this exact locked
+    bible. Do NOT invent new characters, locations, or palettes. The
+    continued shots must look identical in world and character to what
+    came before:
+
+    LOCKED BIBLE:
+    {json.dumps(existing_bible, indent=2)}
+
+    Use these exact character descriptions, location, light, and palette
+    in the new shots, and return this same bible back in your output.
+    """
+    else:
+        bible_instruction = ""
+
     user_prompt = f"""
-    Convert this script into a storyboard following 
-    your exact instructions:
-    
+    Turn this script into EXACTLY {num_scenes} shots following your
+    instructions. {bible_instruction}
+    Build (or reuse) the story bible, then break the story into
+    single-character shots that intercut so the whole thing looks like
+    one continuous film. Never place two named characters in the same shot.
+
+    SCRIPT:
     {script}
     """
-    
+
     try:
         response = client.chat.completions.create(
             model=QWEN_MODEL,
@@ -88,45 +117,58 @@ def generate_storyboard(script: str) -> list:
                 {"role": "system", "content": STORYBOARD_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            max_tokens=1500,
-            temperature=0.5
+            max_tokens=2000,
+            temperature=0.4
         )
-        
-        storyboard_text = response.choices[0].message.content
-        
-        # Extract just the Prompt lines for Wan API
-        scenes = []
-        lines = storyboard_text.split('\n')
-        
-        for line in lines:
-            if line.strip().startswith('Prompt:'):
-                prompt = line.replace('Prompt:', '').strip()
-                scenes.append(prompt)
-        
-        return scenes
-    
+
+        raw = response.choices[0].message.content.strip()
+
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        # Strip em-dashes everywhere before parsing
+        raw = raw.replace("\u2014", ",").replace("--", ",")
+
+        data = json.loads(raw)
+        scenes = data.get("scenes", [])[:num_scenes]
+        bible = data.get("bible", existing_bible or {})
+
+        if not scenes:
+            raise Exception("No scenes produced")
+
+        return {"scenes": scenes, "bible": bible}
+
+    except json.JSONDecodeError:
+        raise Exception(
+            "Storyboard did not return valid JSON. Raw output:\n" + raw
+        )
     except Exception as e:
         raise Exception(f"Storyboard generation failed: {str(e)}")
 
 
-# Test the agent directly
+# Text-only test — costs zero video quota
 if __name__ == "__main__":
-    # Sample script for testing
     test_script = """
     SCENE 1:
     [Kitchen, morning]
-    She picks up his phone. One message. Her face changes.
-    [EDITOR: Close up on eyes — hold 2 seconds]
-    
+    Lily picks up Jamal's phone. One message. Her face changes.
+
     SCENE 2:
     [Living room]
-    He walks in smiling. She doesn't move.
-    "You're up early." She turns slowly.
-    [EDITOR: Wide shot — slow zoom in on her face]
+    Jamal walks in smiling. "You're up early." She doesn't move.
+
+    SCENE 3:
+    [Balcony, dusk]
+    Lily takes off her ring, places it on the railing, walks away.
     """
-    
+
     print("Generating storyboard...\n")
-    scenes = generate_storyboard(test_script)
-    
-    for i, scene in enumerate(scenes, 1):
-        print(f"Scene {i}: {scene}\n")
+    result = generate_storyboard(test_script, num_scenes=3)
+    print("BIBLE:", json.dumps(result["bible"], indent=2), "\n")
+    for i, scene in enumerate(result["scenes"], 1):
+        print(f"--- SHOT {i} ---")
+        print(scene)
+        print()

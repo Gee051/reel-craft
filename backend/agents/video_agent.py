@@ -48,7 +48,11 @@ def poll_for_video(task_id: str) -> str:
             print(f"Video ready: {video_url}\n")
             return video_url
         elif task_status == "FAILED":
-            raise Exception(f"Wan task failed: {status_response.message}")
+            print("FULL FAILURE RESPONSE:")
+            print(status_response)
+            code = getattr(status_response.output, 'code', 'unknown')
+            msg = getattr(status_response.output, 'message', 'no message')
+            raise Exception(f"Wan task failed — code: {code}, message: {msg}")
         elif task_status in ["PENDING", "RUNNING"]:
             continue
     raise Exception("Video generation timed out after 10 minutes")

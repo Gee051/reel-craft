@@ -1,195 +1,222 @@
 import { useState } from "react";
+import { FiFilm } from "react-icons/fi";
 import "./App.css";
+
+const API = "http://localhost:5000";
 
 function App() {
   const [topic, setTopic] = useState("");
   const [genre, setGenre] = useState("drama");
   const [loading, setLoading] = useState(false);
-  const [stage, setStage] = useState("");
-  const [result, setResult] = useState(null);
+  const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState(null);
-  const [showPipeline, setShowPipeline] = useState(false);
-  const [completedStages, setCompletedStages] = useState([]);
+  const [demoMode, setDemoMode] = useState(false);
 
-  const stages = [
-    { id: 1, name: "Script Generation", desc: "Writing your drama script..." },
-    { id: 2, name: "Storyboard", desc: "Breaking script into visual scenes..." },
-    { id: 3, name: "Video Generation", desc: "Generating clips via Wan AI..." },
-    { id: 4, name: "Assembly", desc: "Assembling final video..." },
-  ];
+  // preview = free text output (enriched + script) before spending video quota
+  const [preview, setPreview] = useState(null);
+  const [editedScript, setEditedScript] = useState("");
 
-  const handleGenerate = async () => {
+  // parts = each produced video (Part 1, Part 2, ...)
+  const [parts, setParts] = useState([]);
+
+  // continuation input
+  const [continuing, setContinuing] = useState(false);
+  const [continueText, setContinueText] = useState("");
+
+  // STEP 1 — free: enrich + script + storyboard, no video
+  const handleGenerateScript = async () => {
     if (!topic.trim()) return;
-
     setLoading(true);
+    setLoadingMsg("Writing your script...");
     setError(null);
-    setResult(null);
-    setCompletedStages([]);
-    setStage("Script Generation");
-
+    setPreview(null);
     try {
-      // Simulate stage progression for UI
-      // Real pipeline runs on backend
-      const stageDelay = (stageName, delay) =>
-        new Promise((resolve) =>
-          setTimeout(() => {
-            setStage(stageName);
-            resolve();
-          }, delay)
-        );
-
-      // Start the actual API call
-      const fetchPromise = fetch("http://localhost:5000/generate", {
+      const res = await fetch(`${API}/generate/preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic, genre }),
       });
-
-      // Update UI stages while backend works
-      await stageDelay("Script Generation", 0);
-      await stageDelay("Storyboard", 8000);
-      setCompletedStages([1]);
-      await stageDelay("Video Generation", 5000);
-      setCompletedStages([1, 2]);
-      await stageDelay("Assembly", 60000);
-      setCompletedStages([1, 2, 3]);
-
-      // Wait for actual response
-      const response = await fetchPromise;
-      const data = await response.json();
-
+      const data = await res.json();
       if (data.success) {
-        setCompletedStages([1, 2, 3, 4]);
-        setResult(data);
-        setStage("Complete");
+        setPreview(data);
+        setEditedScript(data.script);
       } else {
         setError(data.error || "Something went wrong");
       }
-    } catch (err) {
+    } catch {
       setError("Could not connect to backend. Make sure Flask is running.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReset = () => {
-    setTopic("");
-    setResult(null);
+  // STEP 2 — produce video from the (possibly edited) script
+  const handleProduce = async () => {
+    setLoading(true);
+    setLoadingMsg("Producing your film. This takes a few minutes...");
     setError(null);
-    setStage("");
-    setCompletedStages([]);
-    setShowPipeline(false);
+
+    const isContinuation = preview?.isContinuation;
+    const endpoint = isContinuation
+      ? `${API}/generate/from-script-video`
+      : `${API}/generate`;
+    const body = isContinuation
+      ? { script: editedScript, bible: preview.bible }
+      : { topic, genre, script: editedScript };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setParts((prev) => [
+          ...prev,
+          {
+            label: `Part ${prev.length + 1}`,
+            video_url: data.video_url,
+            script: editedScript,
+            enriched: data.enriched_prompt || preview?.enriched_prompt,
+            vibe: data.vibe || preview?.vibe,
+            bible: data.bible || preview?.bible,
+            topic: preview?.topic || topic,
+            storyboard: data.storyboard,
+          },
+        ]);
+        setPreview(null);
+        setContinuing(false);
+        setContinueText("");
+      } else {
+        setError(data.error || "Video generation failed");
+      }
+    } catch {
+      setError("Could not reach backend during video production.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // CONTINUATION — build next part's script from user's added text, reuse bible
+  const handleContinueScript = async () => {
+    if (!continueText.trim()) return;
+    const lastPart = parts[parts.length - 1];
+    setLoading(true);
+    setLoadingMsg("Writing the next part...");
+    setError(null);
+    try {
+      const res = await fetch(`${API}/generate/from-script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script: continueText, bible: lastPart.bible }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPreview({ ...data, isContinuation: true, bible: lastPart.bible });
+        setEditedScript(continueText);
+      } else {
+        setError(data.error || "Could not build continuation");
+      }
+    } catch {
+      setError("Could not reach backend.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewStory = () => {
+    setTopic("");
+    setPreview(null);
+    setParts([]);
+    setError(null);
+    setContinuing(false);
+    setContinueText("");
+    setEditedScript("");
+  };
+
+  const showInput = parts.length === 0 && !preview && !loading;
 
   return (
     <div className="app">
-      {/* Header */}
       <header className="header">
         <div className="header-inner">
           <div className="logo">
-            <span className="logo-icon">🎬</span>
+            <span className="logo-icon"><FiFilm /></span>
             <span className="logo-text">ReelCraft</span>
           </div>
-          <span className="logo-tag">AI Showrunner</span>
+          <div className="header-right">
+            <label className="demo-switch">
+              <input
+                type="checkbox"
+                checked={demoMode}
+                onChange={(e) => setDemoMode(e.target.checked)}
+              />
+              <span>Demo mode</span>
+            </label>
+            <span className="logo-tag">AI Showrunner</span>
+          </div>
         </div>
       </header>
 
       <main className="main">
-        {/* Hero */}
-        {!result && (
-          <div className="hero">
-            <h1 className="hero-title">
-              From idea to short drama
-              <br />
-              <span className="hero-accent">in minutes.</span>
-            </h1>
-            <p className="hero-sub">
-              Powered by Qwen + Wan AI on Alibaba Cloud.
-              Type a topic, get a fully produced short drama.
-            </p>
-          </div>
-        )}
-
-        {/* Input Section */}
-        {!result && (
-          <div className="input-card">
-            <div className="input-group">
-              <label className="input-label">What's your drama about?</label>
-              <textarea
-                className="input-textarea"
-                placeholder="e.g. A girl discovers her boyfriend has a secret family..."
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                disabled={loading}
-                rows={3}
-              />
+        {/* Hero + input */}
+        {showInput && (
+          <>
+            <div className="hero">
+              <h1 className="hero-title">
+                Type a few words.
+                <br />
+                <span className="hero-accent">Get a directed film.</span>
+              </h1>
+              <p className="hero-sub">
+                ReelCraft rewrites your idea into cinematic direction, then
+                produces it with Qwen + Wan AI on Alibaba Cloud.
+              </p>
             </div>
 
-            <div className="input-group">
-              <label className="input-label">Genre</label>
-              <select
-                className="input-select"
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                disabled={loading}
+            <div className="input-card">
+              <div className="input-group">
+                <label className="input-label">What do you want to see?</label>
+                <textarea
+                  className="input-textarea"
+                  placeholder="e.g. a girl walking down the aisle"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Genre hint (optional)</label>
+                <select
+                  className="input-select"
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                >
+                  <option value="drama">Drama</option>
+                  <option value="romance">Romance</option>
+                  <option value="thriller">Thriller</option>
+                  <option value="comedy">Comedy</option>
+                </select>
+              </div>
+
+              <button
+                className="btn-generate"
+                onClick={handleGenerateScript}
+                disabled={!topic.trim()}
               >
-                <option value="drama">Drama</option>
-                <option value="romance">Romance</option>
-                <option value="thriller">Thriller</option>
-                <option value="comedy">Comedy</option>
-              </select>
+                Generate script
+              </button>
             </div>
-
-            <button
-              className="btn-generate"
-              onClick={handleGenerate}
-              disabled={loading || !topic.trim()}
-            >
-              {loading ? "Generating..." : "Generate Drama"}
-            </button>
-
-            {/* Pipeline Toggle */}
-            <button
-              className="btn-pipeline-toggle"
-              onClick={() => setShowPipeline(!showPipeline)}
-            >
-              {showPipeline ? "Hide" : "Show"} pipeline view
-            </button>
-          </div>
+          </>
         )}
 
-        {/* Pipeline View */}
-        {showPipeline && loading && (
-          <div className="pipeline-card">
-            <h3 className="pipeline-title">Agent Pipeline</h3>
-            <div className="pipeline-stages">
-              {stages.map((s) => {
-                const isComplete = completedStages.includes(s.id);
-                const isActive = stage === s.name;
-                return (
-                  <div
-                    key={s.id}
-                    className={`pipeline-stage ${
-                      isComplete
-                        ? "stage-complete"
-                        : isActive
-                        ? "stage-active"
-                        : "stage-pending"
-                    }`}
-                  >
-                    <div className="stage-indicator">
-                      {isComplete ? "✓" : isActive ? "⟳" : s.id}
-                    </div>
-                    <div className="stage-info">
-                      <div className="stage-name">{s.name}</div>
-                      <div className="stage-desc">
-                        {isActive ? s.desc : isComplete ? "Done" : "Waiting"}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* Loading */}
+        {loading && (
+          <div className="loading-card">
+            <div className="loading-spinner" />
+            <p className="loading-text">{loadingMsg}</p>
           </div>
         )}
 
@@ -200,48 +227,118 @@ function App() {
           </div>
         )}
 
-        {/* Result */}
-        {result && (
+        {/* Script preview — editable, before spending video quota */}
+        {preview && !loading && (
           <div className="result-section">
             <div className="result-header">
-              <h2 className="result-title">Your Drama is Ready</h2>
-              <button className="btn-reset" onClick={handleReset}>
-                Create Another
-              </button>
+              <h2 className="result-title">
+                {preview.isContinuation ? "Next part — review the script" : "Review your script"}
+              </h2>
+              {preview.vibe && <span className="vibe-badge">{preview.vibe}</span>}
             </div>
 
-            {/* Video Player */}
-            <div className="video-card">
-              <video
-                className="video-player"
-                controls
-                src={`http://localhost:5000${result.video_url}`}
+            {demoMode && preview.enriched_prompt && (
+              <div className="transform-card">
+                <span className="transform-label">Cinematic prompt (enriched)</span>
+                <p className="transform-rich">{preview.enriched_prompt}</p>
+              </div>
+            )}
+
+            <div className="script-card">
+              <label className="input-label">Script — edit freely before producing</label>
+              <textarea
+                className="script-editor"
+                value={editedScript}
+                onChange={(e) => setEditedScript(e.target.value)}
+                rows={14}
               />
             </div>
 
-            {/* Script */}
-            <div className="script-card">
-              <h3 className="script-title">Generated Script</h3>
-              <pre className="script-text">{result.script}</pre>
+            <div className="preview-actions">
+              <button className="btn-generate" onClick={handleProduce}>
+                Produce video
+              </button>
+              <button className="btn-reset" onClick={handleNewStory}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Produced parts */}
+        {parts.length > 0 && !preview && !loading && (
+          <div className="result-section">
+            <div className="result-header">
+              <h2 className="result-title">Your film</h2>
+              <button className="btn-reset" onClick={handleNewStory}>
+                Create another story
+              </button>
             </div>
 
-            {/* Storyboard */}
-            <div className="storyboard-card">
-              <h3 className="storyboard-title">
-                Storyboard — {result.scenes_count} Scenes
-              </h3>
-              {result.storyboard.map((scene, i) => (
-                <div key={i} className="storyboard-scene">
-                  <span className="scene-number">Scene {i + 1}</span>
-                  <p className="scene-prompt">{scene}</p>
+            {parts.map((part, i) => (
+              <div key={i} className="part-block">
+                <div className="part-label">{part.label}</div>
+                <div className="video-card">
+                  <video className="video-player" controls src={`${API}${part.video_url}`} />
                 </div>
-              ))}
-            </div>
+                <a className="btn-download" href={`${API}${part.video_url}`} download>
+                  Download {part.label}
+                </a>
+
+                {demoMode && (
+                  <div className="demo-section">
+                    {part.enriched && (
+                      <div className="transform-card">
+                        <span className="transform-label">Enriched prompt</span>
+                        <p className="transform-rich">{part.enriched}</p>
+                      </div>
+                    )}
+                    <div className="script-card">
+                      <h3 className="section-title">Script</h3>
+                      <pre className="script-text">{part.script}</pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Continue the story */}
+            {!continuing && (
+              <button className="btn-continue" onClick={() => setContinuing(true)}>
+                + Continue the story
+              </button>
+            )}
+
+            {continuing && (
+              <div className="input-card">
+                <label className="input-label">
+                  What happens next? (same character continues)
+                </label>
+                <textarea
+                  className="input-textarea"
+                  placeholder="e.g. she reaches the altar and turns to face the crowd"
+                  value={continueText}
+                  onChange={(e) => setContinueText(e.target.value)}
+                  rows={3}
+                />
+                <div className="preview-actions">
+                  <button
+                    className="btn-generate"
+                    onClick={handleContinueScript}
+                    disabled={!continueText.trim()}
+                  >
+                    Write next part
+                  </button>
+                  <button className="btn-reset" onClick={() => setContinuing(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
 
-      {/* Footer */}
       <footer className="footer">
         <p>Built on Alibaba Cloud · Qwen + Wan AI · Track 2: AI Showrunner</p>
       </footer>

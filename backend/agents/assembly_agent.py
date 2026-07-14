@@ -1,18 +1,21 @@
 import os
+import time
 from moviepy import VideoFileClip, concatenate_videoclips
 
 
-def assemble_video(clip_paths: list, output_filename: str = "final_video.mp4") -> str:
+def assemble_video(clip_paths: list, output_filename: str = None) -> str:
     """
     Assemble individual scene clips into one final video.
 
     Args:
         clip_paths: List of local file paths for all clips in scene order
-        output_filename: Name of the final output video
+        output_filename: Name of the final output video (auto-generated if None)
 
     Returns:
         Local file path of the assembled final video
     """
+    if output_filename is None:
+        output_filename = f"reelcraft_{int(time.time())}.mp4"
 
     print("Starting video assembly...")
     print(f"Assembling {len(clip_paths)} clips...\n")
@@ -81,7 +84,6 @@ def get_output_url(output_path: str) -> str:
     Returns:
         Relative URL string for frontend
     """
-
     filename = os.path.basename(output_path)
     return f"/output/{filename}"
 
@@ -94,5 +96,5 @@ if __name__ == "__main__":
     ]
 
     print("Testing assembly...\n")
-    output = assemble_video(test_clips, "test_output.mp4")
+    output = assemble_video(test_clips)
     print(f"Assembly complete: {output}")

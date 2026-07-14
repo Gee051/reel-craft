@@ -14,10 +14,10 @@ DASHSCOPE_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 QWEN_MODEL = "qwen-plus"
 
 # Wan video generation model
-WAN_MODEL = "wanx2.1-t2v-plus"
+WAN_MODEL = "wan2.2-t2v-plus"
 
 # Video settings
-VIDEO_SIZE = "1280*720"
+VIDEO_SIZE = "1080*1920"
 VIDEO_DURATION = 4  # seconds per scene clip
 
 # Flask settings
